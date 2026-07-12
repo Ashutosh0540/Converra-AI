@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+
+# Virtual Environment
+.venv/
+venv/
+
+# Environment Variables
+.env
+
+# IDE
+.vscode/
+.idea/
+
+# macOS
+.DS_Store
+
+# Logs
+logs/
+*.log
+
+# Database
+*.db
+*.sqlite3
+
+# Alembic cache
+.pytest_cache/
+.mypy_cache/
+
+# Coverage
+.coverage
+htmlcov/
+
+# Build
+dist/
+build/
+
+# Node
+node_modules/
+
+# Chroma
+chroma_db/
+
+# Temporary
+*.tmp
