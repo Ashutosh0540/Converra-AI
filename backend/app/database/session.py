@@ -16,6 +16,7 @@ SessionLocal = sessionmaker(
     autocommit=False,
 )
 
+
 # Base class for all SQLAlchemy models
 class Base(DeclarativeBase):
     pass

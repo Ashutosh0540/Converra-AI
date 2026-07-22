@@ -1,0 +1,35 @@
+# Local Development Run Log
+
+- Inspected repository structure and startup documentation.
+- Read `README.md`, `DEPLOYMENT.md`, `docker-compose.yml`, `docker-compose.dev.yml`, `backend/.env.example`, root `.env.example`, and frontend runtime config.
+- Verified Python, Node.js, npm, and Docker versions.
+- Found missing root `.env` and missing `frontend/.env.example`.
+- Fixed root `.env.example` to use `POSTGRES_DB=converra_ai` and `NEXT_PUBLIC_API_BASE_URL`.
+- Created local root `.env` for Docker Compose development startup.
+- Created `frontend/.env.example`.
+- Added deterministic local embeddings and moved `sentence-transformers` into optional `backend/requirements-ml.txt` to avoid GPU-sized Docker dependency resolution during local startup.
+- Started PostgreSQL with Docker Compose and verified `converra_ai` exists.
+- Built backend Docker image successfully.
+- Found Alembic using placeholder `driver://user:pass@localhost/dbname`; patched Alembic env to use application `DATABASE_URL`.
+- Found PostgreSQL enum migrations creating enum types twice; patched Alembic enum declarations to reuse explicitly-created types.
+- Found `passlib==1.7.4` incompatible with transitive `bcrypt==5.0.0`; pinned `bcrypt==4.2.1` for password hashing.
+- Found host port `8000` already used by unrelated `aegis-ai-api-1`; made backend host port configurable and set local Converra backend to `8001`.
+- Created local `frontend/.env` pointing the dashboard at `http://localhost:8001`.
+- Found host port `8001` returning a non-Converra OpenAPI shape; moved Converra local backend to clean host port `8010` and updated frontend env.
+- Applied Alembic migrations through `20260719_0005`.
+- Seeded demo data successfully: `admin@demo.converra.ai` / `ChangeMe!123`.
+- Started backend container successfully on `http://localhost:8010`.
+- Started frontend dev server successfully on `http://localhost:3002`.
+- Verified backend `/health/live`, `/health/ready`, `/docs`, and `/openapi.json`.
+- Verified seeded login and authenticated dashboard queue API.
+- Verified authenticated `/ws/dashboard` WebSocket.
+- Verified authenticated `/ws/voice` WebSocket session start/end.
+- Ran backend tests: `21 passed`.
+- Ran backend Ruff and scoped mypy checks successfully.
+- Ran frontend production build successfully.
+- Found stale Next build artifacts causing missing `vendor-chunks/lodash.js`; switched frontend to fresh `.next-converra` build directory.
+- Rebuilt frontend successfully using `.next-converra`.
+- Started frontend with `next start` on `http://localhost:3002`.
+- Verified frontend `/`, `/dashboard`, and `/login` return `200 OK`.
+- Re-verified backend `/health/live` and `/health/ready` return `200 OK` on `http://localhost:8010`.
+- Re-verified authenticated dashboard and voice WebSockets.

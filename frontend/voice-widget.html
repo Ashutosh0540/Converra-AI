@@ -1,0 +1,660 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Converra Voice Widget</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b1220;
+      --panel: #121b2e;
+      --panel-2: #172238;
+      --line: #263454;
+      --text: #e7edf8;
+      --muted: #96a3be;
+      --accent: #4f8cff;
+      --accent-2: #30c48d;
+      --danger: #ef6b6b;
+      --warn: #f2b84b;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: linear-gradient(180deg, #0b1220 0%, #0d1528 100%);
+      color: var(--text);
+      font: 14px/1.4 Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    .app {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 320px 1fr;
+    }
+    .sidebar, .main {
+      padding: 16px;
+    }
+    .sidebar {
+      background: rgba(8, 14, 26, 0.92);
+      border-right: 1px solid var(--line);
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+    .brand h1 {
+      margin: 0;
+      font-size: 18px;
+      letter-spacing: 0;
+    }
+    .status-row, .control-row, .field {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 10px;
+      border-radius: 999px;
+      background: var(--panel-2);
+      border: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--muted);
+    }
+    .dot.ok { background: var(--accent-2); }
+    .dot.warn { background: var(--warn); }
+    .dot.bad { background: var(--danger); }
+    label {
+      display: block;
+      margin: 10px 0 6px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    input, button, textarea {
+      font: inherit;
+      color: var(--text);
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      background: #0f1727;
+    }
+    input, textarea {
+      width: 100%;
+      padding: 10px 12px;
+    }
+    textarea {
+      resize: vertical;
+      min-height: 60px;
+    }
+    button {
+      padding: 10px 12px;
+      cursor: pointer;
+      background: #16213a;
+    }
+    button.primary { background: var(--accent); border-color: var(--accent); color: white; }
+    button.good { background: var(--accent-2); border-color: var(--accent-2); color: white; }
+    button.bad { background: var(--danger); border-color: var(--danger); color: white; }
+    button:disabled { opacity: 0.55; cursor: not-allowed; }
+    .main {
+      display: grid;
+      grid-template-rows: auto auto 1fr auto;
+      gap: 12px;
+    }
+    .panel {
+      background: rgba(18, 27, 46, 0.9);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 12px;
+    }
+    .panel h2 {
+      margin: 0 0 10px;
+      font-size: 14px;
+      color: var(--muted);
+      font-weight: 600;
+    }
+    canvas {
+      width: 100%;
+      height: 72px;
+      display: block;
+      background: #08101d;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+    .transcript {
+      display: grid;
+      gap: 8px;
+      overflow: auto;
+      max-height: calc(100vh - 300px);
+    }
+    .turn {
+      padding: 10px 12px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: rgba(15, 23, 39, 0.8);
+    }
+    .turn .role {
+      color: var(--muted);
+      font-size: 11px;
+      margin-bottom: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .turn.assistant { border-left: 3px solid var(--accent); }
+    .turn.user { border-left: 3px solid var(--accent-2); }
+    .turn.system { border-left: 3px solid var(--warn); }
+    .compact {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+    .footer {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+      gap: 8px;
+      align-items: end;
+    }
+    .wave-label {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      color: var(--muted);
+      margin-bottom: 8px;
+      gap: 8px;
+    }
+    .hint {
+      color: var(--muted);
+      font-size: 12px;
+    }
+    @media (max-width: 980px) {
+      .app { grid-template-columns: 1fr; }
+      .sidebar { border-right: 0; border-bottom: 1px solid var(--line); }
+      .transcript { max-height: none; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <h1>Converra Voice</h1>
+        <span class="pill"><span id="connDot" class="dot"></span><span id="connLabel">Disconnected</span></span>
+      </div>
+
+      <label for="apiBase">API Base URL</label>
+      <input id="apiBase" value="http://localhost:8000" />
+
+      <label for="token">Access Token</label>
+      <input id="token" placeholder="Bearer token" />
+
+      <label for="conversationId">Conversation ID</label>
+      <input id="conversationId" placeholder="Optional" />
+
+      <div class="compact">
+        <button id="connectBtn" class="primary">Connect</button>
+        <button id="disconnectBtn" class="bad" disabled>Disconnect</button>
+      </div>
+
+      <div class="status-row">
+        <span class="pill"><span id="micDot" class="dot"></span><span id="micLabel">Mic idle</span></span>
+      </div>
+      <div class="status-row">
+        <span class="pill"><span id="speakDot" class="dot"></span><span id="speakLabel">AI idle</span></span>
+      </div>
+      <div class="status-row">
+        <span class="pill"><span id="modeDot" class="dot warn"></span><span id="modeLabel">Push-to-talk</span></span>
+      </div>
+
+      <div class="compact">
+        <button id="pttBtn" class="good" disabled>Push to Talk</button>
+        <button id="handsFreeBtn" disabled>Hands-free</button>
+      </div>
+
+      <label for="manualText">Manual Text</label>
+      <textarea id="manualText" placeholder="Type a message if you want to test without speech recognition."></textarea>
+      <button id="sendTextBtn" disabled>Send Text</button>
+
+      <p class="hint">Mic capture uses browser APIs. If speech recognition is unavailable, the widget still falls back to audio upload on push-to-talk.</p>
+    </aside>
+
+    <main class="main">
+      <section class="panel">
+        <div class="wave-label">
+          <h2>Live Waveform</h2>
+          <span id="latencyLabel" class="hint">Latency idle</span>
+        </div>
+        <canvas id="waveform" width="960" height="160"></canvas>
+      </section>
+
+      <section class="panel">
+        <div class="wave-label">
+          <h2>Live Transcript</h2>
+          <span id="sessionLabel" class="hint">No session</span>
+        </div>
+        <div id="transcript" class="transcript"></div>
+      </section>
+
+      <section class="panel">
+        <div class="wave-label">
+          <h2>Playback</h2>
+          <span class="hint">Streaming response audio</span>
+        </div>
+        <audio id="player" controls style="width:100%"></audio>
+      </section>
+    </main>
+  </div>
+
+  <script>
+    const apiBaseInput = document.getElementById('apiBase');
+    const tokenInput = document.getElementById('token');
+    const conversationIdInput = document.getElementById('conversationId');
+    const connectBtn = document.getElementById('connectBtn');
+    const disconnectBtn = document.getElementById('disconnectBtn');
+    const pttBtn = document.getElementById('pttBtn');
+    const handsFreeBtn = document.getElementById('handsFreeBtn');
+    const sendTextBtn = document.getElementById('sendTextBtn');
+    const manualTextInput = document.getElementById('manualText');
+    const transcriptEl = document.getElementById('transcript');
+    const connDot = document.getElementById('connDot');
+    const connLabel = document.getElementById('connLabel');
+    const micDot = document.getElementById('micDot');
+    const micLabel = document.getElementById('micLabel');
+    const speakDot = document.getElementById('speakDot');
+    const speakLabel = document.getElementById('speakLabel');
+    const modeDot = document.getElementById('modeDot');
+    const modeLabel = document.getElementById('modeLabel');
+    const latencyLabel = document.getElementById('latencyLabel');
+    const sessionLabel = document.getElementById('sessionLabel');
+    const canvas = document.getElementById('waveform');
+    const ctx = canvas.getContext('2d');
+    const player = document.getElementById('player');
+
+    let socket = null;
+    let sessionId = null;
+    let recording = false;
+    let handsFree = false;
+    let audioStream = null;
+    let mediaRecorder = null;
+    let chunks = [];
+    let audioContext = null;
+    let analyser = null;
+    let animationFrame = null;
+    let recognition = null;
+    let aiChunks = [];
+    let aiSpeaking = false;
+
+    function setStatus(dot, label, state, text) {
+      dot.className = 'dot ' + state;
+      label.textContent = text;
+    }
+
+    function appendTurn(role, text) {
+      const turn = document.createElement('div');
+      turn.className = 'turn ' + role;
+      const roleLabel = document.createElement('div');
+      roleLabel.className = 'role';
+      roleLabel.textContent = role;
+      const body = document.createElement('div');
+      body.textContent = text;
+      turn.appendChild(roleLabel);
+      turn.appendChild(body);
+      transcriptEl.appendChild(turn);
+      transcriptEl.scrollTop = transcriptEl.scrollHeight;
+      return turn;
+    }
+
+    function bytesToBase64(bytes) {
+      let binary = '';
+      for (let i = 0; i < bytes.length; i += 1) {
+        binary += String.fromCharCode(bytes[i]);
+      }
+      return btoa(binary);
+    }
+
+    function base64ToBytes(base64) {
+      const binary = atob(base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i += 1) {
+        bytes[i] = binary.charCodeAt(i);
+      }
+      return bytes;
+    }
+
+    function drawWaveform() {
+      const width = canvas.width;
+      const height = canvas.height;
+      ctx.clearRect(0, 0, width, height);
+      ctx.fillStyle = '#08101d';
+      ctx.fillRect(0, 0, width, height);
+      ctx.strokeStyle = '#4f8cff';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+
+      if (!analyser) {
+        ctx.moveTo(0, height / 2);
+        ctx.lineTo(width, height / 2);
+        ctx.stroke();
+        return;
+      }
+
+      const bufferLength = analyser.fftSize;
+      const dataArray = new Uint8Array(bufferLength);
+      analyser.getByteTimeDomainData(dataArray);
+      const sliceWidth = width / bufferLength;
+      let x = 0;
+      for (let i = 0; i < bufferLength; i += 1) {
+        const v = dataArray[i] / 128.0;
+        const y = (v * height) / 2;
+        if (i === 0) {
+          ctx.moveTo(x, y);
+        } else {
+          ctx.lineTo(x, y);
+        }
+        x += sliceWidth;
+      }
+      ctx.stroke();
+      animationFrame = requestAnimationFrame(drawWaveform);
+    }
+
+    async function connect() {
+      const token = tokenInput.value.trim();
+      const apiBase = apiBaseInput.value.replace(/\/$/, '');
+      if (!token) {
+        appendTurn('system', 'Access token is required.');
+        return;
+      }
+
+      const response = await fetch(apiBase + '/voice/session/start', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer ' + token,
+        },
+        body: JSON.stringify({
+          conversation_id: conversationIdInput.value.trim() || null,
+        }),
+      });
+
+      if (!response.ok) {
+        appendTurn('system', 'Failed to start session.');
+        return;
+      }
+
+      const payload = await response.json();
+      sessionId = payload.session_id;
+      sessionLabel.textContent = 'Session ' + sessionId.slice(0, 8);
+
+      const wsBase = apiBase.replace(/^http/, 'ws');
+      const wsUrl = new URL(payload.websocket_url, wsBase);
+      wsUrl.searchParams.set('token', token);
+      if (conversationIdInput.value.trim()) {
+        wsUrl.searchParams.set('conversation_id', conversationIdInput.value.trim());
+      }
+
+      socket = new WebSocket(wsUrl.toString());
+      socket.onopen = () => {
+        setStatus(connDot, connLabel, 'ok', 'Connected');
+        connectBtn.disabled = true;
+        disconnectBtn.disabled = false;
+        pttBtn.disabled = false;
+        handsFreeBtn.disabled = false;
+        sendTextBtn.disabled = false;
+        appendTurn('system', 'Connected to voice session.');
+      };
+      socket.onclose = () => {
+        setStatus(connDot, connLabel, 'bad', 'Disconnected');
+        connectBtn.disabled = false;
+        disconnectBtn.disabled = true;
+        pttBtn.disabled = true;
+        handsFreeBtn.disabled = true;
+        sendTextBtn.disabled = true;
+      };
+      socket.onerror = () => appendTurn('system', 'WebSocket error.');
+      socket.onmessage = handleMessage;
+    }
+
+    function disconnect() {
+      stopCapture();
+      if (socket) {
+        try { socket.close(); } catch (error) { void error; }
+      }
+      socket = null;
+      sessionId = null;
+      sessionLabel.textContent = 'No session';
+    }
+
+    function startCapture() {
+      if (recording) return;
+      recording = true;
+      setStatus(micDot, micLabel, 'warn', 'Mic active');
+      pttBtn.textContent = 'Release to Send';
+      navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+        audioStream = stream;
+        audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const source = audioContext.createMediaStreamSource(stream);
+        analyser = audioContext.createAnalyser();
+        analyser.fftSize = 512;
+        source.connect(analyser);
+        drawWaveform();
+
+        mediaRecorder = new MediaRecorder(stream);
+        chunks = [];
+        mediaRecorder.ondataavailable = (event) => {
+          if (event.data && event.data.size > 0) {
+            chunks.push(event.data);
+          }
+        };
+        mediaRecorder.onstop = async () => {
+          setStatus(micDot, micLabel, 'ok', 'Mic idle');
+          pttBtn.textContent = 'Push to Talk';
+          if (recognition) {
+            recognition.stop();
+          }
+          if (!socket || !sessionId || chunks.length === 0) {
+            return;
+          }
+          const blob = new Blob(chunks, { type: 'audio/webm' });
+          const buffer = await blob.arrayBuffer();
+          const bytes = new Uint8Array(buffer);
+          socket.send(JSON.stringify({
+            type: 'audio',
+            session_id: sessionId,
+            audio_base64: bytesToBase64(bytes),
+            is_final: true,
+          }));
+          chunks = [];
+        };
+        mediaRecorder.start();
+        if (handsFree) {
+          startRecognition();
+        }
+      }).catch(() => {
+        recording = false;
+        setStatus(micDot, micLabel, 'bad', 'Mic blocked');
+      });
+    }
+
+    function stopCapture() {
+      recording = false;
+      if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+        mediaRecorder.stop();
+      }
+      if (audioStream) {
+        audioStream.getTracks().forEach((track) => track.stop());
+      }
+      if (audioContext) {
+        audioContext.close();
+      }
+      if (animationFrame) {
+        cancelAnimationFrame(animationFrame);
+        animationFrame = null;
+      }
+      analyser = null;
+      mediaRecorder = null;
+      audioStream = null;
+      audioContext = null;
+    }
+
+    function startRecognition() {
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      if (!SpeechRecognition) {
+        modeLabel.textContent = 'Hands-free unavailable';
+        return;
+      }
+
+      recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = 'en-US';
+      let current = '';
+      recognition.onresult = (event) => {
+        let finalText = '';
+        for (let i = event.resultIndex; i < event.results.length; i += 1) {
+          const result = event.results[i];
+          if (result.isFinal) {
+            finalText += result[0].transcript.trim() + ' ';
+          } else {
+            current = result[0].transcript.trim();
+            document.getElementById('manualText').value = current;
+          }
+        }
+        if (finalText.trim() && socket && sessionId) {
+          appendTurn('user', finalText.trim());
+          socket.send(JSON.stringify({
+            type: 'text',
+            session_id: sessionId,
+            text: finalText.trim(),
+            is_final: true,
+          }));
+          current = '';
+        }
+      };
+      recognition.onerror = () => {
+        setStatus(micDot, micLabel, 'bad', 'Recognition error');
+      };
+      recognition.onend = () => {
+        if (handsFree && recording) {
+          recognition.start();
+        }
+      };
+      recognition.start();
+    }
+
+    function stopRecognition() {
+      if (recognition) {
+        try { recognition.stop(); } catch (error) { void error; }
+      }
+      recognition = null;
+    }
+
+    function handleMessage(event) {
+      const message = JSON.parse(event.data);
+      if (message.type === 'session_started') {
+        appendTurn('system', 'Voice session started.');
+        return;
+      }
+
+      if (message.type === 'transcript_partial') {
+        setStatus(micDot, micLabel, 'warn', 'Listening');
+        return;
+      }
+
+      if (message.type === 'transcript_final') {
+        appendTurn('user', message.payload.text || '');
+        return;
+      }
+
+      if (message.type === 'ai_response') {
+        aiChunks = [];
+        aiSpeaking = true;
+        setStatus(speakDot, speakLabel, 'ok', 'AI speaking');
+        latencyLabel.textContent = 'Round trip ' + Math.round(message.payload.latency.total_ms) + ' ms';
+        appendTurn('assistant', message.payload.response.message || '');
+        return;
+      }
+
+      if (message.type === 'audio_chunk') {
+        aiChunks.push(message.payload.audio_base64);
+        if (message.payload.is_final) {
+          playAudio(aiChunks);
+          aiChunks = [];
+          aiSpeaking = false;
+          setStatus(speakDot, speakLabel, 'warn', 'AI idle');
+        }
+        return;
+      }
+
+      if (message.type === 'interrupted') {
+        aiSpeaking = false;
+        aiChunks = [];
+        setStatus(speakDot, speakLabel, 'warn', 'AI interrupted');
+        return;
+      }
+
+      if (message.type === 'session_ended') {
+        appendTurn('system', 'Voice session ended.');
+        disconnect();
+        return;
+      }
+
+      if (message.type === 'error') {
+        appendTurn('system', message.payload.detail || 'Voice error.');
+      }
+    }
+
+    function playAudio(chunksList) {
+      const buffers = chunksList.map((item) => base64ToBytes(item));
+      let total = 0;
+      buffers.forEach((buffer) => { total += buffer.length; });
+      const merged = new Uint8Array(total);
+      let offset = 0;
+      buffers.forEach((buffer) => {
+        merged.set(buffer, offset);
+        offset += buffer.length;
+      });
+      const blob = new Blob([merged], { type: 'audio/wav' });
+      const url = URL.createObjectURL(blob);
+      player.src = url;
+      player.play().catch(() => {});
+    }
+
+    connectBtn.addEventListener('click', connect);
+    disconnectBtn.addEventListener('click', disconnect);
+    pttBtn.addEventListener('mousedown', startCapture);
+    pttBtn.addEventListener('mouseup', stopCapture);
+    pttBtn.addEventListener('mouseleave', () => { if (recording) stopCapture(); });
+    handsFreeBtn.addEventListener('click', () => {
+      handsFree = !handsFree;
+      modeDot.className = handsFree ? 'dot ok' : 'dot warn';
+      modeLabel.textContent = handsFree ? 'Hands-free' : 'Push-to-talk';
+      if (handsFree) {
+        startRecognition();
+      } else {
+        stopRecognition();
+      }
+    });
+    sendTextBtn.addEventListener('click', () => {
+      if (!socket || !sessionId) return;
+      const text = manualTextInput.value.trim();
+      if (!text) return;
+      appendTurn('user', text);
+      socket.send(JSON.stringify({
+        type: 'text',
+        session_id: sessionId,
+        text,
+        is_final: true,
+      }));
+      manualTextInput.value = '';
+    });
+  </script>
+</body>
+</html>

@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import exists, select
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
@@ -16,25 +18,38 @@ class OrganizationRepository:
     def __init__(self, session: Session) -> None:
         self.session = session
 
-    def create(self, organization: Organization) -> Organization:
+    def _commit(self) -> None:
         try:
-            self.session.add(organization)
             self.session.commit()
-            self.session.refresh(organization)
-            return organization
         except SQLAlchemyError as exc:
             self.session.rollback()
             raise OrganizationRepositoryError(
-                "Failed to create organization."
+                "Failed to persist organization changes."
             ) from exc
+
+    def _rollback_and_raise(
+        self,
+        message: str,
+        exc: Exception,
+    ) -> None:
+        self.session.rollback()
+        raise OrganizationRepositoryError(message) from exc
+
+    def create(self, organization: Organization) -> Organization:
+        try:
+            self.session.add(organization)
+            self._commit()
+            self.session.refresh(organization)
+            return organization
+        except SQLAlchemyError as exc:
+            self._rollback_and_raise("Failed to create organization.", exc)
 
     def get_by_id(self, organization_id: UUID) -> Organization | None:
         try:
-            statement = select(Organization).where(
-                Organization.id == organization_id
-            )
+            statement = select(Organization).where(Organization.id == organization_id)
             return self.session.scalars(statement).first()
         except SQLAlchemyError as exc:
+            self.session.rollback()
             raise OrganizationRepositoryError(
                 "Failed to fetch organization by id."
             ) from exc
@@ -44,9 +59,8 @@ class OrganizationRepository:
             statement = select(Organization)
             return list(self.session.scalars(statement).all())
         except SQLAlchemyError as exc:
-            raise OrganizationRepositoryError(
-                "Failed to fetch organizations."
-            ) from exc
+            self.session.rollback()
+            raise OrganizationRepositoryError("Failed to fetch organizations.") from exc
 
     def update(
         self,
@@ -62,14 +76,11 @@ class OrganizationRepository:
                 if field_name != "id":
                     setattr(organization, field_name, field_value)
 
-            self.session.commit()
+            self._commit()
             self.session.refresh(organization)
             return organization
         except SQLAlchemyError as exc:
-            self.session.rollback()
-            raise OrganizationRepositoryError(
-                "Failed to update organization."
-            ) from exc
+            self._rollback_and_raise("Failed to update organization.", exc)
 
     def delete(self, organization_id: UUID) -> bool:
         try:
@@ -78,10 +89,17 @@ class OrganizationRepository:
                 return False
 
             self.session.delete(organization)
-            self.session.commit()
+            self._commit()
             return True
+        except SQLAlchemyError as exc:
+            self._rollback_and_raise("Failed to delete organization.", exc)
+
+    def exists_by_name(self, name: str) -> bool:
+        try:
+            statement = select(exists().where(Organization.name == name))
+            return bool(self.session.scalar(statement))
         except SQLAlchemyError as exc:
             self.session.rollback()
             raise OrganizationRepositoryError(
-                "Failed to delete organization."
+                "Failed to check if organization exists by name."
             ) from exc

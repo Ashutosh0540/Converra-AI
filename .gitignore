@@ -10,6 +10,8 @@ venv/
 
 # Environment Variables
 .env
+.env.*
+!.env.example
 
 # IDE
 .vscode/
@@ -40,9 +42,16 @@ build/
 
 # Node
 node_modules/
+frontend/.next/
+frontend/.next-converra/
+frontend/tsconfig.tsbuildinfo
 
 # Chroma
 chroma_db/
 
 # Temporary
 *.tmp
+
+# Docker and local data
+postgres_data/
+chroma_data/
